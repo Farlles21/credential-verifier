@@ -1,58 +1,112 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Register Credential</title>
+  <meta charset="UTF-8" />
+  <title>Verify Credential</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.umd.min.js"></script>
   <style>
-    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 2rem; }
-    input, button { padding: 0.5rem; margin: 0.5rem 0; width: 100%; }
-    .output { background: #f4f4f4; padding: 1rem; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background-color: #f2f4f8;
+      padding: 2rem;
+      max-width: 600px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+      color: #2a2a2a;
+    }
+    input {
+      width: 100%;
+      padding: 0.8rem;
+      margin-top: 1rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      width: 100%;
+      padding: 1rem;
+      font-size: 1rem;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      margin-top: 1rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+    .status {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border-radius: 8px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .valid { background: #d4edda; color: #155724; }
+    .invalid { background: #f8d7da; color: #721c24; }
+    .loading { background: #fff3cd; color: #856404; }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 </head>
 <body>
-  <h2>Register Credential (School Use)</h2>
+  <h1>Verify Credential</h1>
 
-  <label>Student Name:</label>
-  <input type="text" id="studentName">
+  <label for="hash">Credential Hash:</label>
+  <input type="text" id="hash" placeholder="Paste 0x... hash from diploma" />
 
-  <label>Student ID:</label>
-  <input type="text" id="studentId">
+  <button onclick="verify()">Check Credential</button>
 
-  <label>Graduation Year:</label>
-  <input type="text" id="gradYear">
-
-  <button onclick="generateHash()">Generate Hash & QR Code</button>
-
-  <div class="output">
-    <p><strong>Hash:</strong> <span id="hashOutput"></span></p>
-    <p><strong>QR Code:</strong></p>
-    <div id="qrcode"></div>
-  </div>
+  <div id="statusBox" class="status" style="display:none;">Status goes here</div>
 
   <script>
-    async function generateHash() {
-      const name = document.getElementById("studentName").value.trim();
-      const id = document.getElementById("studentId").value.trim();
-      const year = document.getElementById("gradYear").value.trim();
+    const contractAddress = "0xdE9Ad7Dc869e6798735022052d64806fd30cdDEF";
+    const abi = [
+      {
+        "inputs": [{"internalType": "bytes32", "name": "credentialHash", "type": "bytes32"}],
+        "name": "verifyCredential",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ];
 
-      if (!name || !id || !year) {
-        alert("Please fill in all fields.");
+    async function verify() {
+      const hash = document.getElementById("hash").value.trim();
+      const statusBox = document.getElementById("statusBox");
+
+      if (!hash || !/^0x[a-fA-F0-9]{64}$/.test(hash)) {
+        alert("Please enter a valid SHA-256 hash (starting with 0x and 64 hex characters).");
         return;
       }
 
-      const data = `${name}|${id}|${year}`;
-      const encoder = new TextEncoder();
-      const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(data));
-      const hashHex = [...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, '0')).join('');
-      const fullHash = "0x" + hashHex;
+      statusBox.style.display = "block";
+      statusBox.className = "status loading";
+      statusBox.textContent = "⏳ Checking blockchain...";
 
-      document.getElementById("hashOutput").innerText = fullHash;
+      try {
+        if (!window.ethereum) {
+          alert("MetaMask not detected. Please install it.");
+          return;
+        }
 
-      document.getElementById("qrcode").innerHTML = "";
-      QRCode.toCanvas(fullHash, { width: 180 }, (err, canvas) => {
-        if (err) console.error(err);
-        else document.getElementById("qrcode").appendChild(canvas);
-      });
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        const contract = new ethers.Contract(contractAddress, abi, provider);
+
+        const result = await contract.verifyCredential(hash);
+
+        statusBox.className = result ? "status valid" : "status invalid";
+        statusBox.textContent = result
+          ? "✅ Valid Credential Found"
+          : "❌ Credential Not Found on Blockchain";
+      } catch (err) {
+        console.error(err);
+        statusBox.className = "status invalid";
+        statusBox.textContent = "⚠️ Error verifying hash. Check console.";
+      }
     }
   </script>
 </body>
