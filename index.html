@@ -2,30 +2,61 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Verify Credential</title>
+  <title>Blockchain Credential System</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <style>
     body {
       font-family: 'Poppins', sans-serif;
       background-color: #f2f4f8;
       padding: 2rem;
-      max-width: 600px;
+      max-width: 700px;
       margin: auto;
     }
     h1 {
       text-align: center;
       color: #2a2a2a;
     }
+    .tab-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .tab-buttons button {
+      width: 49%;
+      padding: 1rem;
+      font-size: 1rem;
+      border: none;
+      cursor: pointer;
+      background-color: #ddd;
+      border-radius: 8px;
+      transition: 0.3s;
+    }
+    .tab-buttons button.active {
+      background-color: #2b72ff;
+      color: white;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    label {
+      font-weight: 600;
+      margin-top: 1rem;
+      display: block;
+    }
     input {
       width: 100%;
       padding: 0.8rem;
-      margin-top: 1rem;
-      font-size: 1rem;
+      margin-top: 0.4rem;
       border: 1px solid #ccc;
       border-radius: 8px;
+      font-size: 1rem;
     }
-    button {
+    button.action {
       width: 100%;
       padding: 1rem;
       font-size: 1rem;
@@ -33,11 +64,22 @@
       color: white;
       border: none;
       border-radius: 8px;
-      margin-top: 1rem;
+      margin-top: 1.5rem;
       cursor: pointer;
     }
-    button:hover {
+    button.action:hover {
       background-color: #218838;
+    }
+    .output {
+      background-color: #eef;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1.5rem;
+      word-break: break-word;
+    }
+    canvas {
+      display: block;
+      margin: 1rem auto 0;
     }
     .status {
       margin-top: 1.5rem;
@@ -52,14 +94,42 @@
   </style>
 </head>
 <body>
-  <h1>Verify Credential</h1>
+  <h1>Credential Verification System</h1>
 
-  <label for="hash">Credential Hash:</label>
-  <input type="text" id="hash" placeholder="Paste 0x... hash from diploma" />
+  <div class="tab-buttons">
+    <button id="btnRegister" class="active" onclick="switchTab('register')">🔐 Register</button>
+    <button id="btnVerify" onclick="switchTab('verify')">✅ Verify</button>
+  </div>
 
-  <button onclick="verify()">Check Credential</button>
+  <!-- Register Tab -->
+  <div id="registerTab" class="tab-content active">
+    <label>Student Full Name</label>
+    <input type="text" id="name" placeholder="Juan Dela Cruz" />
+    
+    <label>Student ID</label>
+    <input type="text" id="id" placeholder="2022-00001" />
+    
+    <label>Graduation Year</label>
+    <input type="text" id="year" placeholder="2025" />
+    
+    <button class="action" onclick="generate()">Generate Hash & QR</button>
 
-  <div id="statusBox" class="status" style="display:none;">Status goes here</div>
+    <div id="registerOutput" class="output" style="display:none;">
+      <p><strong>SHA-256 Hash:</strong></p>
+      <p id="hashDisplay"></p>
+      <div id="qrcode"></div>
+    </div>
+  </div>
+
+  <!-- Verify Tab -->
+  <div id="verifyTab" class="tab-content">
+    <label>Credential Hash</label>
+    <input type="text" id="hash" placeholder="Paste 0x... hash from diploma" />
+    
+    <button class="action" onclick="verify()">Check Credential</button>
+
+    <div id="statusBox" class="status" style="display:none;">Status goes here</div>
+  </div>
 
   <script>
     const contractAddress = "0xdE9Ad7Dc869e6798735022052d64806fd30cdDEF";
@@ -73,12 +143,54 @@
       }
     ];
 
+    function switchTab(tab) {
+      document.getElementById("registerTab").classList.remove("active");
+      document.getElementById("verifyTab").classList.remove("active");
+      document.getElementById("btnRegister").classList.remove("active");
+      document.getElementById("btnVerify").classList.remove("active");
+      
+      if (tab === "register") {
+        document.getElementById("registerTab").classList.add("active");
+        document.getElementById("btnRegister").classList.add("active");
+      } else {
+        document.getElementById("verifyTab").classList.add("active");
+        document.getElementById("btnVerify").classList.add("active");
+      }
+    }
+
+    async function generate() {
+      const name = document.getElementById("name").value.trim();
+      const id = document.getElementById("id").value.trim();
+      const year = document.getElementById("year").value.trim();
+
+      if (!name || !id || !year) {
+        alert("Please fill in all fields.");
+        return;
+      }
+
+      const data = `${name}|${id}|${year}`;
+      const encoder = new TextEncoder();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(data));
+      const hashHex = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+      const fullHash = "0x" + hashHex;
+
+      document.getElementById("hashDisplay").textContent = fullHash;
+      document.getElementById("registerOutput").style.display = "block";
+
+      // QR Code
+      document.getElementById("qrcode").innerHTML = "";
+      QRCode.toCanvas(fullHash, { width: 180 }, function (error, canvas) {
+        if (error) console.error(error);
+        else document.getElementById("qrcode").appendChild(canvas);
+      });
+    }
+
     async function verify() {
       const hash = document.getElementById("hash").value.trim();
       const statusBox = document.getElementById("statusBox");
 
-      if (!hash || !/^0x[a-fA-F0-9]{64}$/.test(hash)) {
-        alert("Please enter a valid SHA-256 hash (starting with 0x and 64 hex characters).");
+      if (!/^0x[a-fA-F0-9]{64}$/.test(hash)) {
+        alert("Please enter a valid 66-character SHA-256 hash starting with 0x.");
         return;
       }
 
@@ -95,17 +207,16 @@
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
         const contract = new ethers.Contract(contractAddress, abi, provider);
-
         const result = await contract.verifyCredential(hash);
 
         statusBox.className = result ? "status valid" : "status invalid";
         statusBox.textContent = result
           ? "✅ Valid Credential Found"
-          : "❌ Credential Not Found on Blockchain";
+          : "❌ Credential Not Found";
       } catch (err) {
         console.error(err);
         statusBox.className = "status invalid";
-        statusBox.textContent = "⚠️ Error verifying hash. Check console.";
+        statusBox.textContent = "⚠️ Error verifying hash.";
       }
     }
   </script>
