@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Verify Credential</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.umd.min.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 2rem; }
+    input, button { padding: 0.5rem; margin: 0.5rem 0; width: 100%; }
+    .output { background: #eef; padding: 1rem; }
+  </style>
+</head>
+<body>
+  <h2>Verify Credential (Live via Blockchain)</h2>
+
+  <label>Paste Credential Hash:</label>
+  <input type="text" id="inputHash" placeholder="0x...">
+
+  <button onclick="verify()">Check Credential</button>
+
+  <div class="output" id="resultBox">
+    <p><strong>Status:</strong> <span id="statusText">Not checked yet</span></p>
+  </div>
+
+  <script>
+    const contractAddress = "PASTE_YOUR_DEPLOYED_CONTRACT_ADDRESS_HERE"; // <-- put your deployed Sepolia contract address here
+    const abi = [
+      {
+        "inputs": [{ "internalType": "bytes32", "name": "credentialHash", "type": "bytes32" }],
+        "name": "verifyCredential",
+        "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ];
+
+    async function verify() {
+      const hash = document.getElementById("inputHash").value.trim();
+
+      if (!hash || !hash.startsWith("0x") || hash.length !== 66) {
+        alert("Enter a valid SHA-256 hash (66 characters starting with 0x).");
+        return;
+      }
+
+      if (typeof window.ethereum === "undefined") {
+        alert("Please install MetaMask.");
+        return;
+      }
+
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      const contract = new ethers.Contract(contractAddress, abi, provider);
+      const isValid = await contract.verifyCredential(hash);
+
+      document.getElementById("statusText").innerText = isValid
+        ? "✅ VALID Credential"
+        : "❌ Credential NOT Found";
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Register Credential</title>
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: auto; padding: 2rem; }
+    input, button { padding: 0.5rem; margin: 0.5rem 0; width: 100%; }
+    .output { background: #f4f4f4; padding: 1rem; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+</head>
+<body>
+  <h2>Register Credential (School Use)</h2>
+
+  <label>Student Name:</label>
+  <input type="text" id="studentName">
+
+  <label>Student ID:</label>
+  <input type="text" id="studentId">
+
+  <label>Graduation Year:</label>
+  <input type="text" id="gradYear">
+
+  <button onclick="generateHash()">Generate Hash & QR Code</button>
+
+  <div class="output">
+    <p><strong>Hash:</strong> <span id="hashOutput"></span></p>
+    <p><strong>QR Code:</strong></p>
+    <div id="qrcode"></div>
+  </div>
+
+  <script>
+    async function generateHash() {
+      const name = document.getElementById("studentName").value.trim();
+      const id = document.getElementById("studentId").value.trim();
+      const year = document.getElementById("gradYear").value.trim();
+
+      if (!name || !id || !year) {
+        alert("Please fill in all fields.");
+        return;
+      }
+
+      const data = `${name}|${id}|${year}`;
+      const encoder = new TextEncoder();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(data));
+      const hashHex = [...new Uint8Array(hashBuffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+      const fullHash = "0x" + hashHex;
+
+      document.getElementById("hashOutput").innerText = fullHash;
+
+      document.getElementById("qrcode").innerHTML = "";
+      QRCode.toCanvas(fullHash, { width: 180 }, (err, canvas) => {
+        if (err) console.error(err);
+        else document.getElementById("qrcode").appendChild(canvas);
+      });
+    }
+  </script>
+</body>
+</html>
